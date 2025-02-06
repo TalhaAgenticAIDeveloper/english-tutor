@@ -6,4 +6,4 @@ pydub
 asyncio
 edge_tts
 pygame
-pyaudio
+pyaudio-bin
