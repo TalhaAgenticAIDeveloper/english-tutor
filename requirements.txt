@@ -1,9 +1,11 @@
 google-generativeai
 speechrecognition
 streamlit
-openai-whisper 
 pydub
 asyncio
 edge_tts
 pygame
-pyaudio-bin
+sounddevice
+
+
+
