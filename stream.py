@@ -5,9 +5,6 @@ import edge_tts
 import pygame
 import os
 import streamlit as st
-import sounddevice as sd
-import wavio
-import numpy as np
 
 voices = ["en-US-JennyNeural", "en-GB-RyanNeural", "zh-CN-XiaoxiaoNeural"]
 
@@ -18,14 +15,16 @@ model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
 VOICE = voices[0]  # Default voice selection
 OUTPUT_FILE = "test_speed.mp3"
-DURATION = 5  # Recording time in seconds
-SAMPLE_RATE = 44100  # Sample rate
 
-# Memory to maintain the conversation
-conversation_history = []
+st.title("🎤 English Tutor - AI Chatbot")
+
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
+
+recognizer = sr.Recognizer()
 
 def create_prompt(user_input):
-    conversation = "\n".join(conversation_history)
+    conversation = "\n".join(st.session_state.conversation_history)
     prompt = f"""
     You are an AI-powered English tutor. Your role is to help users improve their English language skills. Please follow these guidelines:
 
@@ -45,6 +44,7 @@ def create_prompt(user_input):
     return prompt
 
 async def amain(TEXT):
+    """Generate speech from text and play it."""
     communicator = edge_tts.Communicate(TEXT, VOICE)
     await communicator.save(OUTPUT_FILE)
 
@@ -58,50 +58,42 @@ async def amain(TEXT):
     pygame.mixer.quit()
     os.remove(OUTPUT_FILE)
 
-# Function to record audio using sounddevice
-def record_audio():
-    st.write("🎤 Listening... Speak now!")
-    audio_data = sd.rec(int(DURATION * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype=np.int16)
-    sd.wait()
-    wavio.write("temp_audio.wav", audio_data, SAMPLE_RATE, sampwidth=2)
-    st.write("✅ Recording complete!")
+def listen_speech():
+    """Capture user's speech input and return the text."""
+    with sr.Microphone() as mic:
+        recognizer.adjust_for_ambient_noise(mic, duration=0.5)
+        st.write("Listening... 🎤")
+        audio = recognizer.listen(mic)
 
-# Function to transcribe recorded audio
-def transcribe_audio():
-    recognizer = sr.Recognizer()
-    with sr.AudioFile("temp_audio.wav") as source:
-        audio = recognizer.record(source)
-    try:
-        text = recognizer.recognize_google(audio)
-        return text
-    except sr.UnknownValueError:
-        return "Sorry, I couldn't understand that."
+        try:
+            text = recognizer.recognize_google(audio)  # Uses Google Web Speech API
+            return text
+        except sr.UnknownValueError:
+            return "Sorry, I couldn't understand that."
 
-# Streamlit UI
-st.title("🎙️ Real-Time English Tutor")
-
-if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
-
-if "chat_active" not in st.session_state:
-    st.session_state.chat_active = False
-
-st.write("Click **Start Chat** to begin a real-time conversation.")
-
-if st.button("Start Chat"):
-    st.session_state.chat_active = True
-
-if st.session_state.chat_active:
+# **Chatbot Loop** - Runs each time user clicks "Start Chat"
+if st.button("Start Chat 🎙️"):
     while True:
-        record_audio()  # Automatically record after each AI response
-        text = transcribe_audio()
+        # **User Speech Input**
+        user_input = listen_speech()
 
-        if text:
-            st.session_state.conversation_history.append(f"User: {text}")
-            prompt = create_prompt(text)
-            response = model.generate_content(prompt)
-            TEXT = response.text if response else "Sorry, I couldn't process that."
+        if user_input.lower() == "exit":
+            st.write("Chat ended. Restart to begin again.")
+            break
 
-            st.session_state.conversation_history.append(f"AI Tutor: {TEXT}")
-            # st.write("**AI Tutor:**", TEXT)
-            asyncio.run(amain(TEXT))  # Speak the response automatically
+        st.session_state.conversation_history.append(f"User: {user_input}")
+
+        # **AI Response**
+        prompt = create_prompt(user_input)
+        response = model.generate_content(prompt)
+        ai_response = response.text if response else "Sorry, I couldn't process that."
+
+        st.session_state.conversation_history.append(f"AI Tutor: {ai_response}")
+
+        # **Display AI Response**
+        st.write("**AI Tutor:**", ai_response)
+
+        # **Text-to-Speech Response**
+        asyncio.run(amain(ai_response))
+
+        # Automatically loop back and allow the user to speak again

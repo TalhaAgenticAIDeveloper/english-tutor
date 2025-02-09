@@ -1,12 +1,9 @@
 google-generativeai
-
 speechrecognition
 streamlit
 asyncio
 edge_tts
 pygame
-wavio 
-sounddevice 
 numpy 
 
 
