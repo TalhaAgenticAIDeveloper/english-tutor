@@ -6,7 +6,9 @@ asyncio
 edge_tts
 pygame
 pyaudio
-
+wavio 
+sounddevice 
+numpy 
 
 
 
